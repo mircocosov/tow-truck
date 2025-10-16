@@ -1,0 +1,37 @@
+# Django и основные зависимости
+Django==4.2.7
+djangorestframework==3.14.0
+django-cors-headers==4.3.1
+
+# База данных
+psycopg2-binary==2.9.7  # Для PostgreSQL (опционально)
+
+# Аутентификация и безопасность
+djangorestframework-simplejwt==5.3.0
+
+# Медиа файлы и изображения
+Pillow==10.0.1
+
+# Валидация и сериализация
+django-filter==23.3
+
+# Уведомления
+celery==5.3.4
+redis==5.0.1
+
+# Логирование и мониторинг
+django-extensions==3.2.3
+
+# Разработка и тестирование
+pytest==7.4.3
+pytest-django==4.7.0
+factory-boy==3.3.0
+
+# Документация API
+drf-yasg==1.21.7
+
+# Геолокация
+geopy==2.4.0
+
+# Утилиты
+python-decouple==3.8
