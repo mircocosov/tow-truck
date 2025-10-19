@@ -111,9 +111,7 @@ logs/
 *.bmp
 *.tiff
 *.tif
-*.docx
 *.pdf
-*.doc
 
 # Backup files
 *.bak
