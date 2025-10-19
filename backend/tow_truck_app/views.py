@@ -4,8 +4,11 @@ API Views для системы эвакуатора.
 Представления для обработки HTTP-запросов от мобильного приложения.
 """
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from rest_framework import generics, status, permissions
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -20,13 +23,16 @@ from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .models import (
     User, VehicleType, TowTruck, Order, OrderStatusHistory,
-    Payment, Rating, Notification
+    Payment, Rating, Notification, SupportTicket, SupportMessage
 )
 from .serializers import (
     UserRegistrationSerializer, UserSerializer, UserLoginSerializer,
     VehicleTypeSerializer, TowTruckSerializer, OrderCreateSerializer,
     OrderSerializer, OrderUpdateSerializer, PaymentSerializer,
-    RatingSerializer, NotificationSerializer, LocationUpdateSerializer
+    RatingSerializer, NotificationSerializer, LocationUpdateSerializer,
+    SupportTicketSerializer, SupportTicketCreateSerializer,
+    SupportTicketUpdateSerializer, SupportMessageSerializer,
+    SupportMessageCreateSerializer, PasswordResetSerializer
 )
 from .jwt_serializers import CustomTokenObtainPairSerializer, CustomTokenRefreshSerializer
 
@@ -66,7 +72,7 @@ class UserRegistrationView(generics.CreateAPIView):
                 "application/json": {
                     "user": {
                         "id": 1,
-                        "username": "client1",
+                        "phone": "+79001234567",
                         "email": "client1@example.com",
                         "user_type": "CLIENT"
                     },
@@ -99,6 +105,20 @@ def login_view(request):
         })
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def password_reset(request):
+    """
+    API endpoint для сброса пароля по номеру телефона.
+    """
+
+    serializer = PasswordResetSerializer(data=request.data, context={'request': request})
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+
+    return Response({'message': 'Пароль успешно обновлен.'})
 
 
 class UserProfileView(generics.RetrieveUpdateAPIView):
@@ -174,19 +194,21 @@ class OrderListView(generics.ListAPIView):
     def get_queryset(self):
         user = self.request.user
         
-        # Проверка для Swagger генерации схемы
-        if not user.is_authenticated:
+        if getattr(self, 'swagger_fake_view', False):
             return Order.objects.none()
         
-        if user.user_type == 'CLIENT':
+        if not getattr(user, 'is_authenticated', False):
+            return Order.objects.none()
+        
+        if getattr(user, 'user_type', None) == 'CLIENT':
             return Order.objects.filter(client=user).select_related(
                 'client', 'vehicle_type', 'tow_truck', 'tow_truck__driver'
             )
-        elif user.user_type == 'DRIVER':
+        elif getattr(user, 'user_type', None) == 'DRIVER':
             return Order.objects.filter(tow_truck__driver=user).select_related(
                 'client', 'vehicle_type', 'tow_truck', 'tow_truck__driver'
             )
-        elif user.user_type == 'OPERATOR':
+        elif getattr(user, 'user_type', None) == 'OPERATOR' or getattr(user, 'is_staff', False):
             return Order.objects.all().select_related(
                 'client', 'vehicle_type', 'tow_truck', 'tow_truck__driver'
             )
@@ -205,11 +227,17 @@ class OrderDetailView(generics.RetrieveUpdateAPIView):
     def get_queryset(self):
         user = self.request.user
         
-        if user.user_type == 'CLIENT':
+        if getattr(self, 'swagger_fake_view', False):
+            return Order.objects.none()
+        
+        if not getattr(user, 'is_authenticated', False):
+            return Order.objects.none()
+        
+        if getattr(user, 'user_type', None) == 'CLIENT':
             return Order.objects.filter(client=user)
-        elif user.user_type == 'DRIVER':
+        elif getattr(user, 'user_type', None) == 'DRIVER':
             return Order.objects.filter(tow_truck__driver=user)
-        elif user.user_type == 'OPERATOR':
+        elif getattr(user, 'user_type', None) == 'OPERATOR' or getattr(user, 'is_staff', False):
             return Order.objects.all()
         
         return Order.objects.none()
@@ -226,9 +254,15 @@ class OrderUpdateStatusView(generics.UpdateAPIView):
     def get_queryset(self):
         user = self.request.user
         
-        if user.user_type == 'DRIVER':
+        if getattr(self, 'swagger_fake_view', False):
+            return Order.objects.none()
+        
+        if not getattr(user, 'is_authenticated', False):
+            return Order.objects.none()
+        
+        if getattr(user, 'user_type', None) == 'DRIVER':
             return Order.objects.filter(tow_truck__driver=user)
-        elif user.user_type == 'OPERATOR':
+        elif getattr(user, 'user_type', None) == 'OPERATOR' or getattr(user, 'is_staff', False):
             return Order.objects.all()
         
         return Order.objects.none()
@@ -292,31 +326,201 @@ class OrderUpdateStatusView(generics.UpdateAPIView):
 @permission_classes([IsAuthenticated])
 def update_location(request):
     """
-    API endpoint для обновления местоположения водителя.
+    Update driver coordinates and broadcast them to all subscribers listening over WebSocket.
     """
-    
+
     if request.user.user_type != 'DRIVER':
         return Response(
-            {'error': 'Только водители могут обновлять местоположение'},
+            {'error': 'Only drivers can update their live location.'},
             status=status.HTTP_403_FORBIDDEN
         )
-    
+
     serializer = LocationUpdateSerializer(data=request.data)
-    if serializer.is_valid():
-        try:
-            tow_truck = TowTruck.objects.get(driver=request.user)
-            tow_truck.current_location_lat = serializer.validated_data['latitude']
-            tow_truck.current_location_lon = serializer.validated_data['longitude']
-            tow_truck.save()
-            
-            return Response({'message': 'Местоположение обновлено'})
-        except TowTruck.DoesNotExist:
-            return Response(
-                {'error': 'Эвакуатор не найден для данного водителя'},
-                status=status.HTTP_404_NOT_FOUND
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        tow_truck = TowTruck.objects.select_related('driver').get(driver=request.user)
+    except TowTruck.DoesNotExist:
+        return Response(
+            {'error': 'No tow truck is assigned to this driver.'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    tow_truck.current_location_lat = serializer.validated_data['latitude']
+    tow_truck.current_location_lon = serializer.validated_data['longitude']
+    tow_truck.last_location_update = timezone.now()
+    tow_truck.save(update_fields=['current_location_lat', 'current_location_lon', 'last_location_update'])
+
+    payload = {
+        'type': 'update',
+        'location': {
+            'tow_truck_id': str(tow_truck.id),
+            'latitude': tow_truck.current_location_lat,
+            'longitude': tow_truck.current_location_lon,
+            'updated_at': tow_truck.last_location_update.isoformat(),
+        },
+    }
+
+    channel_layer = get_channel_layer()
+    if channel_layer:
+        async_to_sync(channel_layer.group_send)(
+            f'tow_truck_{tow_truck.id}',
+            {
+                'type': 'location_update',
+                'payload': payload | {'tow_truck_id': str(tow_truck.id)},
+            },
+        )
+
+        active_statuses = ['PENDING', 'CONFIRMED', 'ASSIGNED', 'IN_PROGRESS']
+        for order_id in Order.objects.filter(
+            tow_truck=tow_truck,
+            status__in=active_statuses
+        ).values_list('id', flat=True):
+            async_to_sync(channel_layer.group_send)(
+                f'order_{order_id}',
+                {
+                    'type': 'location_update',
+                    'payload': payload | {'order_id': str(order_id)},
+                },
             )
-    
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    return Response(
+        {
+            'message': 'Location updated.',
+            'location': payload['location'],
+        }
+    )
+
+
+
+class SupportTicketListCreateView(generics.ListCreateAPIView):
+    """List existing tickets for the current user or create a new one."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return SupportTicket.objects.none()
+        queryset = SupportTicket.objects.select_related('author', 'assigned_to', 'related_order')
+        user = self.request.user
+        if not getattr(user, 'is_authenticated', False):
+            return SupportTicket.objects.none()
+        if getattr(user, 'is_staff', False) or getattr(user, 'user_type', None) == 'OPERATOR':
+            return queryset.order_by('-created_at')
+        return queryset.filter(author=user).order_by('-created_at')
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return SupportTicketCreateSerializer
+        return SupportTicketSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    def perform_create(self, serializer):
+        ticket = serializer.save(author=self.request.user)
+        message = SupportMessage.objects.create(
+            ticket=ticket,
+            author=self.request.user,
+            body=ticket.description,
+            is_internal=False,
+        )
+        ticket.last_message_at = message.created_at
+        ticket.save(update_fields=['last_message_at'])
+
+
+class SupportTicketDetailView(generics.RetrieveUpdateAPIView):
+    """Retrieve a single ticket or update it (for operators)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return SupportTicket.objects.none()
+        queryset = SupportTicket.objects.select_related('author', 'assigned_to', 'related_order').prefetch_related('messages__author')
+        user = self.request.user
+        if not getattr(user, 'is_authenticated', False):
+            return SupportTicket.objects.none()
+        if getattr(user, 'is_staff', False) or getattr(user, 'user_type', None) == 'OPERATOR':
+            return queryset
+        return queryset.filter(author=user)
+
+    def get_serializer_class(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return SupportTicketUpdateSerializer
+        return SupportTicketSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if not (user.is_staff or getattr(user, 'user_type', None) == 'OPERATOR'):
+            disallowed = set(serializer.validated_data.keys()) - {'priority'}
+            if disallowed:
+                raise PermissionDenied('Only operators can change ticket status or assignment.')
+        serializer.save()
+
+
+class SupportMessageListCreateView(generics.ListCreateAPIView):
+    """List or add messages inside a support ticket."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return SupportMessageCreateSerializer
+        return SupportMessageSerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    def get_ticket(self):
+        if not hasattr(self, '_ticket'):
+            ticket = get_object_or_404(SupportTicket.objects.select_related('author', 'assigned_to'), id=self.kwargs['ticket_id'])
+            if not self._has_access(ticket):
+                raise PermissionDenied('You do not have access to this ticket.')
+            self._ticket = ticket
+        return self._ticket
+
+    def _has_access(self, ticket):
+        user = self.request.user
+        if getattr(user, 'is_staff', False) or getattr(user, 'user_type', None) == 'OPERATOR':
+            return True
+        if getattr(user, 'is_authenticated', False) and ticket.author_id == user.id:
+            return True
+        if getattr(user, 'is_authenticated', False) and ticket.assigned_to_id == user.id:
+            return True
+        return False
+
+    def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return SupportMessage.objects.none()
+        ticket = self.get_ticket()
+        return ticket.messages.select_related('author').order_by('created_at')
+
+    def perform_create(self, serializer):
+        ticket = self.get_ticket()
+        message = serializer.save(ticket=ticket, author=self.request.user)
+
+        updates = {'last_message_at': message.created_at}
+        if ticket.status == 'OPEN' and self.request.user != ticket.author:
+            updates['status'] = 'IN_PROGRESS'
+        if ticket.assigned_to is None and (self.request.user.is_staff or getattr(self.request.user, 'user_type', None) == 'OPERATOR'):
+            updates['assigned_to'] = self.request.user
+
+        if updates:
+            for field, value in updates.items():
+                setattr(ticket, field, value)
+            ticket.save(update_fields=list(updates.keys()))
+
 
 
 class PaymentCreateView(generics.CreateAPIView):
@@ -356,6 +560,10 @@ class NotificationListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):
+            return Notification.objects.none()
+        if not getattr(self.request.user, 'is_authenticated', False):
+            return Notification.objects.none()
         return Notification.objects.filter(user=self.request.user)
 
 
@@ -386,7 +594,10 @@ def dashboard_stats(request):
     
     user = request.user
     
-    if user.user_type == 'CLIENT':
+    if not getattr(user, 'is_authenticated', False):
+        return Response({})
+    
+    if getattr(user, 'user_type', None) == 'CLIENT':
         stats = {
             'total_orders': Order.objects.filter(client=user).count(),
             'active_orders': Order.objects.filter(
@@ -403,7 +614,7 @@ def dashboard_stats(request):
             ).count()
         }
     
-    elif user.user_type == 'DRIVER':
+    elif getattr(user, 'user_type', None) == 'DRIVER':
         driver_orders = Order.objects.filter(tow_truck__driver=user)
         stats = {
             'total_orders': driver_orders.count(),
@@ -424,7 +635,7 @@ def dashboard_stats(request):
             ).count()
         }
     
-    elif user.user_type == 'OPERATOR':
+    elif getattr(user, 'user_type', None) == 'OPERATOR' or getattr(user, 'is_staff', False):
         stats = {
             'total_orders': Order.objects.count(),
             'pending_orders': Order.objects.filter(status='PENDING').count(),
@@ -439,3 +650,6 @@ def dashboard_stats(request):
         }
     
     return Response(stats)
+
+
+

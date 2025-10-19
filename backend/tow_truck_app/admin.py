@@ -9,7 +9,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
 from .models import (
     User, VehicleType, TowTruck, Order, OrderStatusHistory,
-    Payment, Rating, Notification
+    Payment, Rating, Notification, SupportTicket, SupportMessage
 )
 
 
@@ -200,6 +200,35 @@ class NotificationAdmin(admin.ModelAdmin):
 
 
 # Настройка заголовков админ-панели
+
+
+@admin.register(SupportTicket)
+class SupportTicketAdmin(admin.ModelAdmin):
+    """Admin configuration for support tickets."""
+
+    list_display = ('id', 'subject', 'author', 'status', 'priority', 'assigned_to', 'created_at')
+    list_filter = ('status', 'priority', 'created_at')
+    search_fields = ('id', 'subject', 'author__username', 'assigned_to__username')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'closed_at', 'last_message_at')
+    autocomplete_fields = ('author', 'assigned_to', 'related_order')
+    ordering = ('-created_at',)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('author', 'assigned_to', 'related_order')
+
+
+@admin.register(SupportMessage)
+class SupportMessageAdmin(admin.ModelAdmin):
+    """Admin configuration for support ticket messages."""
+
+    list_display = ('id', 'ticket', 'author', 'is_internal', 'created_at')
+    list_filter = ('is_internal', 'created_at')
+    search_fields = ('ticket__id', 'ticket__subject', 'author__username', 'body')
+    readonly_fields = ('id', 'created_at')
+    autocomplete_fields = ('ticket', 'author')
+    ordering = ('-created_at',)
+
+
 admin.site.site_header = "Администрирование системы эвакуатора"
 admin.site.site_title = "Система эвакуатора"
 admin.site.index_title = "Панель управления"

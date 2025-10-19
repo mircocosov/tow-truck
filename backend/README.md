@@ -264,3 +264,26 @@ coverage report
 ## Поддержка
 
 Для вопросов и предложений создавайте issues в репозитории проекта.
+
+
+## Real-time Tracking
+
+- WebSocket endpoint for orders: `ws://<host>/ws/orders/<order_id>/location/`
+- WebSocket endpoint for tow trucks: `ws://<host>/ws/tow-trucks/<tow_truck_id>/location/`
+- Authenticate with an access token: append `?token=<JWT_ACCESS_TOKEN>` to the URL or open the socket from an authenticated session.
+- Messages are JSON payloads with the `location`, `order_id` or `tow_truck_id`, and an `updated_at` timestamp.
+- Drivers must regularly call `POST /api/v1/location/update/` to publish fresh coordinates.
+
+## Support Tickets API
+
+- List or create tickets: `GET|POST /api/v1/support/tickets/`
+- Ticket details / updates: `GET|PATCH /api/v1/support/tickets/<ticket_id>/`
+- Conversation messages: `GET|POST /api/v1/support/tickets/<ticket_id>/messages/`
+- Initial ticket creation automatically records the first message using the description body.
+- Operators can assign tickets, add internal notes, and change status to `IN_PROGRESS`, `RESOLVED`, or `CLOSED`.
+
+
+### Аутентификация
+
+- Вход выполняется по номеру телефона и паролю (например, `client1` → `+79001234567`).
+- Для восстановления пароля используйте POST `/api/v1/auth/password/reset/` c номером телефона и новым паролем.

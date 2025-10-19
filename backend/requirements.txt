@@ -1,37 +1,38 @@
-# Django и основные зависимости
+# Django и основные библиотеки проекта
 Django==4.2.7
 djangorestframework==3.14.0
 django-cors-headers==4.3.1
 
-# База данных
-psycopg2-binary==2.9.7  # Для PostgreSQL (опционально)
+# Драйверы и доступ к БД
+psycopg2-binary==2.9.7  # PostgreSQL
 
 # Аутентификация и безопасность
 djangorestframework-simplejwt==5.3.0
 
-# Медиа файлы и изображения
+# Работа с медиа
 Pillow==10.0.1
 
-# Валидация и сериализация
+# Фильтрация и расширения
 django-filter==23.3
+django-extensions==3.2.3
 
-# Уведомления
+# Очереди и фоновые задачи
 celery==5.3.4
 redis==5.0.1
 
-# Логирование и мониторинг
-django-extensions==3.2.3
+# Реал-тайм стек
+channels==4.0.0
+channels-redis==4.1.0
+daphne==4.0.0
 
-# Разработка и тестирование
+# Тестирование
 pytest==7.4.3
 pytest-django==4.7.0
 factory-boy==3.3.0
 
-# Документация API
+# Документация и геолокация
 drf-yasg==1.21.7
-
-# Геолокация
 geopy==2.4.0
 
-# Утилиты
+# Переменные окружения
 python-decouple==3.8

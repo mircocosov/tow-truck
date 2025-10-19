@@ -122,7 +122,3 @@ logs/
 # Local configuration files
 local_settings.py
 settings_local.py
-
-# Secrets
-secrets.json
-config.json

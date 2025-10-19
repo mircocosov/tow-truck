@@ -548,3 +548,141 @@ class Notification(models.Model):
     
     def __str__(self):
         return f"{self.title} - {self.user.username}"
+
+
+class SupportTicket(models.Model):
+    """
+    A support ticket created by a user to contact dispatch or operators.
+    """
+
+    STATUS_CHOICES = [
+        ('OPEN', 'Open'),
+        ('IN_PROGRESS', 'In progress'),
+        ('RESOLVED', 'Resolved'),
+        ('CLOSED', 'Closed'),
+    ]
+
+    PRIORITY_CHOICES = [
+        ('LOW', 'Low'),
+        ('NORMAL', 'Normal'),
+        ('HIGH', 'High'),
+        ('URGENT', 'Urgent'),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        verbose_name='Ticket ID'
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='support_tickets',
+        verbose_name='Author'
+    )
+    subject = models.CharField(
+        max_length=255,
+        verbose_name='Subject'
+    )
+    description = models.TextField(
+        verbose_name='Initial description'
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='OPEN',
+        verbose_name='Status'
+    )
+    priority = models.CharField(
+        max_length=10,
+        choices=PRIORITY_CHOICES,
+        default='NORMAL',
+        verbose_name='Priority'
+    )
+    related_order = models.ForeignKey(
+        Order,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Related order'
+    )
+    assigned_to = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_support_tickets',
+        limit_choices_to={'user_type': 'OPERATOR'},
+        verbose_name='Assigned operator'
+    )
+    closed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Closed at'
+    )
+    last_message_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Last message at'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Created at'
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name='Updated at'
+    )
+
+    class Meta:
+        verbose_name = 'Support ticket'
+        verbose_name_plural = 'Support tickets'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.subject} ({self.get_status_display()})"
+
+
+class SupportMessage(models.Model):
+    """
+    Individual message inside a support ticket conversation.
+    """
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        verbose_name='Message ID'
+    )
+    ticket = models.ForeignKey(
+        SupportTicket,
+        on_delete=models.CASCADE,
+        related_name='messages',
+        verbose_name='Ticket'
+    )
+    author = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='support_messages',
+        verbose_name='Author'
+    )
+    body = models.TextField(
+        verbose_name='Body'
+    )
+    is_internal = models.BooleanField(
+        default=False,
+        verbose_name='Internal note'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Created at'
+    )
+
+    class Meta:
+        verbose_name = 'Support message'
+        verbose_name_plural = 'Support messages'
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Message by {self.author} at {self.created_at:%Y-%m-%d %H:%M}"

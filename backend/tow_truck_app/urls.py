@@ -19,6 +19,7 @@ urlpatterns = [
     # Аутентификация
     path('auth/register/', views.UserRegistrationView.as_view(), name='user-register'),
     path('auth/login/', views.login_view, name='user-login'),
+    path('auth/password/reset/', views.password_reset, name='password-reset'),
     path('auth/token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('auth/profile/', views.UserProfileView.as_view(), name='user-profile'),
     
@@ -43,6 +44,11 @@ urlpatterns = [
     # Уведомления
     path('notifications/', views.NotificationListView.as_view(), name='notifications'),
     path('notifications/<int:notification_id>/read/', views.mark_notification_read, name='notification-read'),
+    # Support tickets
+    path('support/tickets/', views.SupportTicketListCreateView.as_view(), name='support-ticket-list-create'),
+    path('support/tickets/<uuid:pk>/', views.SupportTicketDetailView.as_view(), name='support-ticket-detail'),
+    path('support/tickets/<uuid:ticket_id>/messages/', views.SupportMessageListCreateView.as_view(), name='support-ticket-messages'),
+
     
     # Местоположение
     path('location/update/', views.update_location, name='location-update'),
@@ -53,3 +59,5 @@ urlpatterns = [
 
 # Добавляем маршруты из роутера
 urlpatterns += router.urls
+
+

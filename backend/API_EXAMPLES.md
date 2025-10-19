@@ -277,3 +277,70 @@ const orders = await api.getOrders();
 - **403** - Доступ запрещен
 - **404** - Ресурс не найден
 - **500** - Внутренняя ошибка сервера
+
+
+## Real-time Location WebSocket
+
+### JavaScript example
+
+```javascript
+const orderId = '550e8400-e29b-41d4-a716-446655440000';
+const socket = new WebSocket(`ws://127.0.0.1:8000/ws/orders/${orderId}/location/?token=${accessToken}`);
+
+socket.onmessage = (event) => {
+  const payload = JSON.parse(event.data);
+  console.log('Live location update', payload.location);
+};
+```
+
+### Sample payload
+
+```json
+{
+  "type": "update",
+  "order_id": "550e8400-e29b-41d4-a716-446655440000",
+  "location": {
+    "tow_truck_id": "2c9d4f2a-2f1e-4c66-bf4f-06d22aa6ef73",
+    "latitude": 55.7558,
+    "longitude": 37.6176,
+    "updated_at": "2025-10-18T23:51:04.123456+03:00"
+  }
+}
+```
+
+## Support Tickets
+
+### Create a ticket
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/support/tickets/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d '{
+    "subject": "Need help with my order",
+    "description": "Driver is delayed by 30 minutes",
+    "priority": "HIGH"
+  }'
+```
+
+### Post a message to a ticket
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/support/tickets/${TICKET_ID}/messages/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -d '{
+    "body": "Can you provide an ETA?"
+  }'
+```
+### ����� ������
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/auth/password/reset/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "phone": "+79001234567",
+    "new_password": "NewStrongPass123!",
+    "new_password_confirm": "NewStrongPass123!"
+  }'
+```
