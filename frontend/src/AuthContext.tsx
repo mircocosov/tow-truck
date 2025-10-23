@@ -12,7 +12,6 @@ import {
   parseResponse,
   createApiError,
   type HttpMethod,
-  type ApiError,
 } from "./api";
 
 interface AuthState {
@@ -87,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await parseResponse(response);
       if (!response.ok) {
         throw createApiError(
-          "РќРµ СѓРґР°Р»РѕСЃСЊ РІС‹РїРѕР»РЅРёС‚СЊ РІС…РѕРґ",
+          "Не удалось выполнить вход",
           response.status,
           data,
         );
@@ -111,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await parseResponse(response);
       if (!response.ok) {
         throw createApiError(
-          "РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°СЂРµРіРёСЃС‚СЂРёСЂРѕРІР°С‚СЊ РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ",
+          "Регистрация не удалась",
           response.status,
           data,
         );
@@ -143,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await parseResponse(response);
       if (!response.ok) {
         throw createApiError(
-          "РќРµ СѓРґР°Р»РѕСЃСЊ СЃР±СЂРѕСЃРёС‚СЊ РїР°СЂРѕР»СЊ",
+          "Не удалось сменить пароль",
           response.status,
           data,
         );

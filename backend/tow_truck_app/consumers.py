@@ -128,7 +128,7 @@ class LocationConsumer(AsyncJsonWebsocketConsumer):
     def _can_access_order(self, order: Order) -> bool:
         if not self.user:
             return False
-        if self.user.is_staff or getattr(self.user, "user_type", None) == "OPERATOR":
+        if self.user.is_staff or getattr(self.user, "user_type_id", None) == "OPERATOR":
             return True
         if order.client_id == self.user.id:
             return True
@@ -140,7 +140,7 @@ class LocationConsumer(AsyncJsonWebsocketConsumer):
     def _can_access_tow_truck(self, tow_truck: TowTruck) -> bool:
         if not self.user:
             return False
-        if self.user.is_staff or getattr(self.user, "user_type", None) == "OPERATOR":
+        if self.user.is_staff or getattr(self.user, "user_type_id", None) == "OPERATOR":
             return True
         if tow_truck.driver_id == self.user.id:
             return True

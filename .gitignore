@@ -101,7 +101,6 @@ logs/
 *.db
 
 # Media files (изображения, документы)
-*.png
 *.jpg
 *.jpeg
 *.gif

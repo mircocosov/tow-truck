@@ -1,61 +1,64 @@
-import { useState } from "react";
+import type { ReactNode } from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./AuthContext";
+import AuthPage from "./AuthPage";
+import Home from "./Home";
+import AdminPanel from "./AdminPanel";
 import Dashboard from "./Dashboard";
-import LoginForm from "./LoginForm";
-import RegistrationForm from "./RegistrationForm";
-import PasswordResetForm from "./PasswordResetForm";
 
-type AuthMode = "login" | "register" | "reset";
+function ProtectedRoute({
+  children,
+  requireOperator = false,
+}: {
+  children: ReactNode;
+  requireOperator?: boolean;
+}) {
+  const { accessToken, user } = useAuth();
 
-function AuthGate() {
-  const { accessToken } = useAuth();
-  const [mode, setMode] = useState<AuthMode>("login");
-
-  if (accessToken) {
-    return <Dashboard />;
+  if (!accessToken) {
+    return <Navigate to="/login" replace />;
   }
 
-  return (
-    <div className="auth-wrapper">
-      <div className="auth-card">
-        <h1>
-          {mode === "login"
-            ? "Вход"
-            : mode === "register"
-              ? "Регистрация"
-              : "Сброс пароля"}
-        </h1>
+  if (requireOperator && user?.user_type !== "OPERATOR") {
+    return <Navigate to="/" replace />;
+  }
 
-        {mode === "login" && <LoginForm />}
-        {mode === "register" && <RegistrationForm />}
-        {mode === "reset" && <PasswordResetForm />}
-
-        <div className="auth-links">
-          {mode !== "login" && (
-            <button type="button" onClick={() => setMode("login")}>
-              У меня есть аккаунт
-            </button>
-          )}
-          {mode !== "register" && (
-            <button type="button" onClick={() => setMode("register")}>
-              Регистрация
-            </button>
-          )}
-          {mode !== "reset" && (
-            <button type="button" onClick={() => setMode("reset")}>
-              Забыли пароль?
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  return <>{children}</>;
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <AuthGate />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<AuthPage />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Home />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requireOperator>
+                <AdminPanel />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/playground"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
     </AuthProvider>
   );
 }

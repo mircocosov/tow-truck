@@ -25,10 +25,15 @@ urlpatterns = [
     
     # Типы транспортных средств
     path('vehicle-types/', views.VehicleTypeListView.as_view(), name='vehicle-types'),
+    path('vehicle-types/<int:pk>/', views.VehicleTypeDetailView.as_view(), name='vehicle-types-detail'),
     
     # Эвакуаторы
     path('tow-trucks/', views.TowTruckListView.as_view(), name='tow-trucks'),
-    
+
+    # Стоимость эвакуатора
+    path('pricing/estimate/', views.PriceEstimateView.as_view(), name='price-estimate'),
+    path('weather/', views.WeatherLookupView.as_view(), name='weather-lookup'),
+
     # Заказы
     path('orders/', views.OrderCreateView.as_view(), name='order-create'),
     path('orders/list/', views.OrderListView.as_view(), name='order-list'),

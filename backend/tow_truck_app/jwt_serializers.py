@@ -18,7 +18,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
         
         # Добавляем дополнительные поля в токен
-        token['user_type'] = user.user_type
+        token['user_type'] = user.user_type_id
+        token['user_type_label'] = user.user_type.name if user.user_type else None
         token['username'] = user.username
         token['email'] = user.email
         token['phone'] = user.phone
@@ -37,7 +38,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'phone': self.user.phone,
             'first_name': self.user.first_name,
             'last_name': self.user.last_name,
-            'user_type': self.user.user_type,
+            'user_type': self.user.user_type_id,
+            'user_type_label': self.user.user_type.name if self.user.user_type else None,
             'is_verified': self.user.is_verified,
             'avatar': self.user.avatar.url if self.user.avatar else None,
         }

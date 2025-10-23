@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useAuth } from "../AuthContext";
 import { parseResponse } from "../api";
 
@@ -22,7 +22,7 @@ const presets: Preset[] = [
       new_password: "NewStrongPass123!",
       new_password_confirm: "NewStrongPass123!",
     },
-    description: "Номер телефона должен существовать в системе.",
+    description: "Смена пароля по номеру телефона",
   },
   {
     name: "Vehicle types (GET)",
@@ -43,31 +43,27 @@ const presets: Preset[] = [
     name: "Order detail (GET)",
     method: "GET",
     path: "orders/<order_id>/",
-    description: "Замените <order_id> на настоящий UUID.",
+    description: "<order_id> необходимо заменить на реальный UUID заказа",
   },
   {
     name: "Create order (POST, CLIENT)",
     method: "POST",
     path: "orders/",
     body: {
+      vehicle: 1,
       vehicle_type: 1,
-      vehicle_make: "Toyota",
-      vehicle_model: "Camry",
-      vehicle_year: 2020,
-      vehicle_color: "Черный",
-      license_plate: "А123ВС777",
-      pickup_address: "Москва, Красная площадь, 1",
+      pickup_address: "Москва, Тверская, 1",
       pickup_latitude: 55.7539,
       pickup_longitude: 37.6208,
-      delivery_address: "Москва, Проспект Мира, 10",
-      delivery_latitude: 55.7814,
-      delivery_longitude: 37.6339,
-      description: "Тестовый заказ",
+      delivery_address: "Москва, Варшавское шоссе, 170",
+      delivery_latitude: 55.6364,
+      delivery_longitude: 37.6567,
+      description: "Блокировка колес",
       priority: "NORMAL",
     },
   },
   {
-    name: "Update order status (PATCH, OPERATOR/DRIVER)",
+    name: "Update order status (PATCH)",
     method: "PATCH",
     path: "orders/<order_id>/update-status/",
     body: { status: "IN_PROGRESS" },
@@ -95,7 +91,7 @@ const presets: Preset[] = [
     body: {
       driver_rating: 5,
       service_rating: 5,
-      comment: "Отлично! Спасибо.",
+      comment: "Быстро и аккуратно",
     },
   },
   {
@@ -113,33 +109,22 @@ const presets: Preset[] = [
     method: "POST",
     path: "support/tickets/",
     body: {
-      subject: "Нужна помощь",
-      description: "Машина не заводится после эвакуации",
+      subject: "Не работает отслеживание",
+      description: "После обновления клиентской версии не видно эвакуатор на карте",
       priority: "NORMAL",
-    },
-  },
-  {
-    name: "Add support message (POST)",
-    method: "POST",
-    path: "support/tickets/<ticket_id>/messages/",
-    body: {
-      body: "Есть новости?",
-      is_internal: false,
     },
   },
 ];
 
-function pretty(value: unknown) {
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return value;
-    }
+function pretty(data: unknown) {
+  if (typeof data === "string") {
+    return data;
   }
-  if (value === undefined) return "";
-  return JSON.stringify(value, null, 2);
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return String(data);
+  }
 }
 
 export default function RequestRunner() {
@@ -148,7 +133,7 @@ export default function RequestRunner() {
   const [method, setMethod] = useState<HttpMethod>("GET");
   const [path, setPath] = useState("vehicle-types/");
   const [body, setBody] = useState<string>("");
-  const [response, setResponse] = useState<string>("");
+  const [responseText, setResponseText] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
@@ -166,21 +151,21 @@ export default function RequestRunner() {
         : "",
     );
     setStatus(preset.description ?? "");
-    setResponse("");
+    setResponseText("");
   };
 
   const sendRequest = async () => {
+    if (!path.trim()) {
+      setStatus("Укажите путь или URL запроса");
+      return;
+    }
+
     setLoading(true);
-    setStatus("Отправляем запрос...");
-    setResponse("");
+    setStatus("Выполняем запрос...");
+    setResponseText("");
 
     try {
-      if (!path.trim()) {
-        setStatus("Укажите путь до эндпоинта.");
-        return;
-      }
-
-      const init: RequestInit = { method };
+      const init: RequestInit & { method?: HttpMethod } = { method };
       if (!["GET", "DELETE"].includes(method) && body.trim()) {
         init.body = body;
       }
@@ -188,11 +173,11 @@ export default function RequestRunner() {
       const response = await apiFetch(path.trim(), init);
       const payload = await parseResponse(response);
       setStatus(`HTTP ${response.status}`);
-      setResponse(pretty(payload));
+      setResponseText(pretty(payload));
     } catch (error) {
       if (error instanceof Error) {
         setStatus("Ошибка выполнения запроса");
-        setResponse(error.message);
+        setResponseText(error.message);
       } else {
         setStatus("Неизвестная ошибка");
       }
@@ -211,7 +196,7 @@ export default function RequestRunner() {
             onChange={(event) => applyPreset(event.target.value)}
           >
             <option value="" disabled>
-              Выберите пресет…
+              Выберите пример запроса
             </option>
             {presets.map((preset) => (
               <option key={preset.name} value={preset.name}>
@@ -256,7 +241,7 @@ export default function RequestRunner() {
         </label>
 
         <button onClick={sendRequest} disabled={loading}>
-          {loading ? "Отправляем..." : "Send request"}
+          {loading ? "Выполняем..." : "Send request"}
         </button>
         {status && <p className="request-status">{status}</p>}
       </div>
@@ -264,7 +249,7 @@ export default function RequestRunner() {
       <div className="request-runner__right">
         <h4>Response</h4>
         <pre className="response-block">
-          {response || "Ответ появится после отправки запроса."}
+          {responseText || "Ответ сервера появится здесь."}
         </pre>
       </div>
     </div>

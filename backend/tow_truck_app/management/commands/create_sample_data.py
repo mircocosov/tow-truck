@@ -1,121 +1,191 @@
 """
-Команда Django для создания тестовых данных.
-
-Создает базовые данные для тестирования системы эвакуатора.
+Management command that seeds the database with demo data.
 """
 
+from __future__ import annotations
+
 from django.core.management.base import BaseCommand
-from tow_truck_app.models import User, VehicleType, TowTruck, Order
+from django.db import transaction
+
+from tow_truck_app.models import (
+    ClientVehicle,
+    NotificationType,
+    Order,
+    PaymentMethod,
+    PaymentStatus,
+    TicketStatus,
+    TowTruck,
+    User,
+    UserType,
+    VehicleType,
+)
 
 
 class Command(BaseCommand):
-    help = 'Создает тестовые данные для системы эвакуатора'
+    help = "Populate the database with a minimal set of reference data and demo accounts."
 
+    @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write('Создание тестовых данных...')
+        self.stdout.write("Creating reference data…")
 
-        # Создаем типы транспортных средств
-        vehicle_types_data = [
+        user_types = [
+            ("CLIENT", "Клиент"),
+            ("DRIVER", "Водитель"),
+            ("OPERATOR", "Оператор"),
+        ]
+        for code, name in user_types:
+            UserType.objects.update_or_create(code=code, defaults={"name": name})
+
+        payment_methods = [
+            ("CASH", "Наличные"),
+            ("CARD", "Банковская карта"),
+            ("BANK_TRANSFER", "Банковский перевод"),
+            ("MOBILE_PAYMENT", "Мобильный платёж"),
+        ]
+        for code, name in payment_methods:
+            PaymentMethod.objects.update_or_create(code=code, defaults={"name": name})
+
+        payment_statuses = [
+            ("PENDING", "Ожидает обработки"),
+            ("PROCESSING", "В обработке"),
+            ("COMPLETED", "Завершён"),
+            ("FAILED", "Не удалось"),
+            ("REFUNDED", "Возвращён"),
+        ]
+        for code, name in payment_statuses:
+            PaymentStatus.objects.update_or_create(code=code, defaults={"name": name})
+
+        notification_types = [
+            ("ORDER_CREATED", "Заказ создан"),
+            ("ORDER_CONFIRMED", "Заказ подтверждён"),
+            ("ORDER_ASSIGNED", "Назначен эвакуатор"),
+            ("ORDER_IN_PROGRESS", "Заказ в работе"),
+            ("ORDER_COMPLETED", "Заказ выполнен"),
+            ("ORDER_CANCELLED", "Заказ отменён"),
+            ("PAYMENT_RECEIVED", "Платёж получен"),
+            ("DRIVER_ARRIVED", "Водитель прибыл"),
+            ("GENERAL", "Общее уведомление"),
+        ]
+        for code, name in notification_types:
+            NotificationType.objects.update_or_create(code=code, defaults={"name": name})
+
+        ticket_statuses = [
+            ("OPEN", "Открыт"),
+            ("IN_PROGRESS", "В работе"),
+            ("RESOLVED", "Решён"),
+            ("CLOSED", "Закрыт"),
+        ]
+        for code, name in ticket_statuses:
+            TicketStatus.objects.update_or_create(code=code, defaults={"name": name})
+
+        self.stdout.write("Creating vehicle types…")
+        vehicle_types = [
             {
-                'name': 'Легковой автомобиль',
-                'description': 'Автомобили массой до 3.5 тонн',
-                'max_weight': 3.5,
-                'base_price': 2500.00
+                "name": "Легковой автомобиль",
+                "description": "Городские автомобили до 3.5 тонн.",
+                "max_weight": 3.5,
+                "base_price": 2500.00,
+                "per_km_rate": 120.00,
             },
             {
-                'name': 'Внедорожник/Кроссовер',
-                'description': 'SUV и кроссоверы массой до 4.5 тонн',
-                'max_weight': 4.5,
-                'base_price': 3000.00
+                "name": "Внедорожник/Кроссовер",
+                "description": "Повышенная проходимость, до 4.5 тонн.",
+                "max_weight": 4.5,
+                "base_price": 3000.00,
+                "per_km_rate": 150.00,
             },
             {
-                'name': 'Микроавтобус',
-                'description': 'Микроавтобусы массой до 6 тонн',
-                'max_weight': 6.0,
-                'base_price': 4000.00
+                "name": "Лёгкий грузовик",
+                "description": "Коммерческий транспорт до 6 тонн.",
+                "max_weight": 6.0,
+                "base_price": 4000.00,
+                "per_km_rate": 180.00,
+            },
+        ]
+        created_vehicle_types = []
+        for payload in vehicle_types:
+            vt, _ = VehicleType.objects.update_or_create(name=payload["name"], defaults=payload)
+            created_vehicle_types.append(vt)
+
+        self.stdout.write("Creating demo users…")
+        demo_users = [
+            {
+                "username": "client1",
+                "email": "client1@example.com",
+                "phone": "+79001234567",
+                "first_name": "Ирина",
+                "last_name": "Клиентова",
+                "user_type_id": "CLIENT",
             },
             {
-                'name': 'Грузовой автомобиль',
-                'description': 'Грузовые автомобили массой до 10 тонн',
-                'max_weight': 10.0,
-                'base_price': 6000.00
-            }
+                "username": "driver1",
+                "email": "driver1@example.com",
+                "phone": "+79001234568",
+                "first_name": "Владимир",
+                "last_name": "Водитель",
+                "user_type_id": "DRIVER",
+            },
+            {
+                "username": "operator1",
+                "email": "operator1@example.com",
+                "phone": "+79001234569",
+                "first_name": "Ольга",
+                "last_name": "Операторова",
+                "user_type_id": "OPERATOR",
+            },
         ]
 
-        for vt_data in vehicle_types_data:
-            vehicle_type, created = VehicleType.objects.get_or_create(
-                name=vt_data['name'],
-                defaults=vt_data
+        for payload in demo_users:
+            user, created = User.objects.update_or_create(
+                username=payload["username"],
+                defaults={k: v for k, v in payload.items() if k != "user_type_id"},
             )
             if created:
-                self.stdout.write(f'Создан тип ТС: {vehicle_type.name}')
-
-        # Создаем тестовых пользователей
-        users_data = [
-            {
-                'username': 'client1',
-                'email': 'client1@example.com',
-                'phone': '+79001234567',
-                'user_type': 'CLIENT',
-                'first_name': 'Иван',
-                'last_name': 'Петров'
-            },
-            {
-                'username': 'driver1',
-                'email': 'driver1@example.com',
-                'phone': '+79001234568',
-                'user_type': 'DRIVER',
-                'first_name': 'Сергей',
-                'last_name': 'Иванов'
-            },
-            {
-                'username': 'operator1',
-                'email': 'operator1@example.com',
-                'phone': '+79001234569',
-                'user_type': 'OPERATOR',
-                'first_name': 'Анна',
-                'last_name': 'Сидорова'
-            }
-        ]
-
-        for user_data in users_data:
-            user, created = User.objects.get_or_create(
-                username=user_data['username'],
-                defaults=user_data
-            )
-            if created:
-                user.set_password('password123')
+                user.user_type_id = payload["user_type_id"]
+                user.set_password("password123")
                 user.save()
-                self.stdout.write(f'Создан пользователь: {user.username}')
 
-        # Создаем эвакуаторы
-        driver = User.objects.get(username='driver1')
-        light_vehicle_type = VehicleType.objects.get(name='Легковой автомобиль')
-        suv_vehicle_type = VehicleType.objects.get(name='Внедорожник/Кроссовер')
+        client = User.objects.get(username="client1")
+        driver = User.objects.get(username="driver1")
 
-        tow_trucks_data = [
-            {
-                'license_plate': 'А123БВ777',
-                'model': 'КАМАЗ-5320',
-                'capacity': 5.0,
-                'driver': driver,
-                'status': 'AVAILABLE'
-            }
-        ]
-
-        for tt_data in tow_trucks_data:
-            tow_truck, created = TowTruck.objects.get_or_create(
-                license_plate=tt_data['license_plate'],
-                defaults=tt_data
-            )
-            if created:
-                tow_truck.vehicle_types.add(light_vehicle_type, suv_vehicle_type)
-                self.stdout.write(f'Создан эвакуатор: {tow_truck.license_plate}')
-
-        self.stdout.write(
-            self.style.SUCCESS('Тестовые данные успешно созданы!')
+        self.stdout.write("Creating client vehicle and tow truck…")
+        client_vehicle, _ = ClientVehicle.objects.update_or_create(
+            license_plate="А123ВС777",
+            defaults={
+                "owner": client,
+                "make": "Toyota",
+                "model": "Camry",
+                "year": 2022,
+                "color": "Белый",
+            },
         )
-        self.stdout.write('\nТестовые учетные записи:')
-        self.stdout.write('Клиент: client1 / password123')
-        self.stdout.write('Водитель: driver1 / password123')
-        self.stdout.write('Оператор: operator1 / password123')
+
+        tow_truck, _ = TowTruck.objects.update_or_create(
+            license_plate="Э001КХ199",
+            defaults={
+                "model": "КАМАЗ-Эвакуатор",
+                "capacity": 5.0,
+                "driver": driver,
+                "status": "AVAILABLE",
+            },
+        )
+        tow_truck.vehicle_types.set(created_vehicle_types)
+
+        if not Order.objects.filter(client=client).exists():
+            order = Order.objects.create(
+                client=client,
+                vehicle=client_vehicle,
+                vehicle_type=created_vehicle_types[0],
+                pickup_address="Москва, ул. Ленина, 1",
+                pickup_latitude=55.7522,
+                pickup_longitude=37.6156,
+                delivery_address="Москва, ул. Тверская, 7",
+                delivery_latitude=55.7652,
+                delivery_longitude=37.6051,
+                description="Не заводится двигатель",
+                estimated_price=5500,
+            )
+            self.stdout.write(f"Создан демонстрационный заказ {order.id}")
+
+        self.stdout.write(self.style.SUCCESS("Демо-данные успешно загружены."))
+        self.stdout.write("Аккаунты:\n - client1 / password123\n - driver1 / password123\n - operator1 / password123")
