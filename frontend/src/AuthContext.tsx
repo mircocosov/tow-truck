@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await parseResponse(response);
       if (!response.ok) {
         throw createApiError(
-          "Не удалось выполнить вход",
+          "Error logging in",
           response.status,
           data,
         );
@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await parseResponse(response);
       if (!response.ok) {
         throw createApiError(
-          "Регистрация не удалась",
+          "Error registering user",
           response.status,
           data,
         );
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await parseResponse(response);
       if (!response.ok) {
         throw createApiError(
-          "Не удалось сменить пароль",
+          "Error resetting password",
           response.status,
           data,
         );

@@ -41,7 +41,7 @@ const YANDEX_API_KEY = import.meta.env.VITE_YANDEX_MAP_API_KEY;
 
 function ensureYandexApiKey(): string {
   if (!YANDEX_API_KEY) {
-    throw new Error("Yandex Maps API key is not configured.");
+    throw new Error("Yandex Maps API ключ не настроен.");
   }
   return YANDEX_API_KEY;
 }
@@ -71,7 +71,7 @@ async function geocode(query: string): Promise<CoordPoint> {
 
   const response = await fetch(url.toString());
   if (!response.ok) {
-    throw new Error("Failed to contact Yandex geocoder.");
+    throw new Error("Невозможно связаться с геокодером Yandex.");
   }
 
   const payload = (await response.json()) as {
@@ -96,14 +96,14 @@ async function geocode(query: string): Promise<CoordPoint> {
   const featureMember = payload.response?.GeoObjectCollection?.featureMember?.[0]?.GeoObject;
   const point = featureMember?.Point?.pos;
   if (!point) {
-    throw new Error("Unable to resolve coordinates for the specified address.");
+    throw new Error("Невозможно получить координаты для указанного адреса.");
   }
 
   const [lonStr, latStr] = point.split(" ");
   const lat = Number(latStr);
   const lon = Number(lonStr);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-    throw new Error("Received invalid coordinates from geocoder.");
+    throw new Error("Получены неверные координаты из геокодера.");
   }
 
   const label =
@@ -206,7 +206,7 @@ export default function Home() {
         const response = await apiFetch("vehicle-types/");
         const data = await parseResponse(response);
         if (!response.ok) {
-          throw createApiError("Failed to load tariff list", response.status, data);
+          throw createApiError("Невозможно загрузить список тарифов", response.status, data);
         }
         const items = Array.isArray(data)
           ? data
@@ -219,7 +219,7 @@ export default function Home() {
         if (error instanceof Error) {
           setVehicleTypesError(error.message);
         } else {
-          setVehicleTypesError("Failed to load tariff list");
+          setVehicleTypesError("Невозможно загрузить список тарифов");
         }
       } finally {
         setVehicleTypesLoading(false);
@@ -249,7 +249,7 @@ export default function Home() {
         });
         const data = await parseResponse(response);
         if (!response.ok) {
-          throw createApiError("Failed to fetch weather", response.status, data);
+          throw createApiError("Невозможно получить погоду", response.status, data);
         }
         setWeather((data ?? null) as WeatherInfo | null);
       } catch (error) {
@@ -257,7 +257,7 @@ export default function Home() {
         if (error instanceof Error) {
           setWeatherError(error.message);
         } else {
-          setWeatherError("Failed to fetch weather");
+          setWeatherError("Невозможно получить погоду");
         }
       } finally {
         setWeatherLoading(false);
@@ -287,14 +287,14 @@ export default function Home() {
         });
         const data = await parseResponse(response);
         if (!response.ok) {
-          throw createApiError("Failed to calculate price", response.status, data);
+          throw createApiError("Невозможно рассчитать цену", response.status, data);
         }
         setPriceByVehicle((prev) => ({ ...prev, [vehicleTypeId]: data as PriceQuote }));
       } catch (error) {
         if (error instanceof Error) {
           setPriceError(error.message);
         } else {
-          setPriceError("Failed to calculate price");
+          setPriceError("Невозможно рассчитать цену");
         }
       } finally {
         setPriceLoading(false);
@@ -356,7 +356,7 @@ export default function Home() {
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       if (!originQuery.trim() || !destinationQuery.trim()) {
-        setRouteError("Specify pick-up and drop-off addresses.");
+        setRouteError("Укажите адрес забора и выгрузки.");
         return;
       }
       setRouteError(null);
@@ -376,7 +376,7 @@ export default function Home() {
         if (error instanceof Error) {
           setRouteError(error.message);
         } else {
-          setRouteError("Unable to build a route for the specified addresses.");
+          setRouteError("Невозможно построить путь для указанных адресов.");
         }
       }
     },
@@ -425,13 +425,13 @@ export default function Home() {
 
   const instructionMessage = useMemo(() => {
     if (!origin || !destination) {
-      return "Specify pick-up and drop-off addresses.";
+      return "Укажите адрес забора и выгрузки.";
     }
     if (!distanceKm) {
-      return "Build the route to calculate the distance.";
+      return "Построить путь для расчета расстояния.";
     }
     if (!selectedVehicleTypeId) {
-      return "Choose a tariff to calculate the price.";
+      return "Изменить калькулятор цены";
     }
     return null;
   }, [origin, destination, distanceKm, selectedVehicleTypeId]);
@@ -468,8 +468,8 @@ export default function Home() {
     <div className="app-shell">
       <header className="top-bar">
         <div className="top-bar__brand">
-          <h1>Tow Service</h1>
-          <p>Hello, {user?.first_name || user?.phone || "client"}!</p>
+          <h1>Эвакуатор</h1>
+          <p>Привет, {user?.first_name || user?.phone || "client"}!</p>
         </div>
         <nav className="top-bar__actions">
           {user?.user_type === "OPERATOR" && (
@@ -512,9 +512,9 @@ export default function Home() {
                     <h3>{type.name}</h3>
                     {type.description && <p>{type.description}</p>}
                     <p className="tariff-meta">
-                      Base price: {formatCurrency(type.base_price, currency)}
+                      Цена: {formatCurrency(type.base_price, currency)}
                       <br />
-                      + {formatCurrency(type.per_km_rate, currency)} per km
+                      + {formatCurrency(type.per_km_rate, currency)} за км
                     </p>
                     {isSelected && priceLoading && (
                       <p className="tariff-price">Calculating...</p>
@@ -522,7 +522,7 @@ export default function Home() {
                     {showPrice && quote && (
                       <p className="tariff-price">
                         {formatCurrency(quote.price, quote.currency)}
-                        <small> for {distanceKm} km</small>
+                        <small> за {distanceKm} km</small>
                       </p>
                     )}
                   </article>
@@ -538,10 +538,10 @@ export default function Home() {
         </section>
 
         <section className="route-planner">
-          <h2>Route</h2>
+          <h2>Путь</h2>
           <form className="route-form" onSubmit={handleRouteSubmit}>
             <label>
-              Pick-up address
+              Адрес забора
               <input
                 type="text"
                 value={originQuery}
@@ -550,7 +550,7 @@ export default function Home() {
               />
             </label>
             <label>
-              Destination address
+              Адрес выгрузки
               <input
                 type="text"
                 value={destinationQuery}
@@ -558,21 +558,21 @@ export default function Home() {
                 placeholder="Russia, Moscow, Varshavskoye highway 170"
               />
             </label>
-            <button type="submit">Build route</button>
+            <button type="submit">Построить путь</button>
           </form>
           {routeError && <p className="error-message">{routeError}</p>}
 
           {origin && destination && (
             <div className="route-summary">
               <p>
-                Start: <strong>{origin.label}</strong>
+                Начало: <strong>{origin.label}</strong>
               </p>
               <p>
-                Finish: <strong>{destination.label}</strong>
+                Конец: <strong>{destination.label}</strong>
               </p>
               {distanceKm && (
                 <p>
-                  Distance: <strong>{distanceKm} km</strong>
+                  Расстояние: <strong>{distanceKm} км</strong>
                 </p>
               )}
             </div>
